@@ -10,26 +10,28 @@ import (
 	// bencode "github.com/jackpal/bencode-go" // Available if you need it!
 )
 
-func decode(b string) (interface{}, error) {
-	if len(b) == 0 {
-		return nil, io.ErrUnexpectedEOF
+func decode(b string, st int) (interface{}, int, error) {
+	if st == len(b) {
+		return nil, st, io.ErrUnexpectedEOF
 	}
 
 	switch {
-	case b[0] == 'i':
-		return decodeInt(b)
-	case b[0] >= '0' && b[0] <= '9':
-		return decodeString(b)
+	case b[st] == 'i':
+		return decodeInt(b, st)
+	case b[st] == 'l':
+		return decodeList(b, st)
+	case b[st] >= '0' && b[st] <= '9':
+		return decodeString(b, st)
 	default:
-		return nil, fmt.Errorf("unexpected value type: %q", b[0])
+		return nil, st, fmt.Errorf("unexpected value type: %q", b[st])
 	}
 }
 
-func decodeInt(b string) (int, error) {
-	i := 1
+func decodeInt(b string, st int) (int, int, error) {
+	i := st + 1
 
 	if i == len(b) {
-		return 0, io.ErrUnexpectedEOF
+		return 0, st, io.ErrUnexpectedEOF
 	}
 
 	neg := false
@@ -47,41 +49,69 @@ func decodeInt(b string) (int, error) {
 	}
 
 	if i == len(b) || b[i] != 'e' {
-		return 0, fmt.Errorf("bad int")
+		return 0, st, fmt.Errorf("bad int")
 	}
 
-	//	i++
+	i++
 
 	if neg {
 		x = -x
 	}
 
-	return x, nil
+	return x, i, nil
 }
 
-func decodeString(b string) (string, error) {
+func decodeList(b string, st int) ([]interface{}, int, error) {
+	i := st + 1
+
+	var err error
+	l := make([]interface{}, 0, 4)
+
+	for {
+		if i == len(b) {
+			return nil, st, io.ErrUnexpectedEOF
+		}
+
+		if b[i] == 'e' {
+			break
+		}
+
+		var x interface{}
+
+		x, i, err = decode(b, i)
+		if err != nil {
+			return nil, i, err
+		}
+
+		l = append(l, x)
+	}
+
+	return l, i, nil
+}
+
+func decodeString(b string, st int) (string, int, error) {
 	var l int
 
-	i := 0
+	i := st
 	for i < len(b) && b[i] >= '0' && b[i] <= '9' {
 		l = l*10 + (int(b[i]) - '0')
 		i++
 	}
 
 	if i == len(b) || b[i] != ':' {
-		return "", fmt.Errorf("bad string")
+		return "", st, fmt.Errorf("bad string")
 	}
 
 	i++
 
 	if i+l > len(b) {
-		return "", fmt.Errorf("bad string: out of bounds")
+		return "", st, fmt.Errorf("bad string: out of bounds")
 	}
 
 	x := b[i : i+l]
-	//	i += l
+	i += l
 
-	return x, nil
+	return x, i, nil
 }
 
 func main() {
@@ -89,7 +119,7 @@ func main() {
 
 	switch command {
 	case "decode":
-		x, err := decode(os.Args[2])
+		x, _, err := decode(os.Args[2], 0)
 		if err != nil {
 			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
