@@ -20,6 +20,8 @@ func decode(b string, st int) (interface{}, int, error) {
 		return decodeInt(b, st)
 	case b[st] == 'l':
 		return decodeList(b, st)
+	case b[st] == 'd':
+		return decodeDict(b, st)
 	case b[st] >= '0' && b[st] <= '9':
 		return decodeString(b, st)
 	default:
@@ -87,6 +89,44 @@ func decodeList(b string, st int) ([]interface{}, int, error) {
 	}
 
 	return l, i, nil
+}
+
+func decodeDict(b string, st int) (map[string]interface{}, int, error) {
+	i := st + 1
+
+	var err error
+	d := make(map[string]interface{}, 4)
+
+	for {
+		if i == len(b) {
+			return nil, st, io.ErrUnexpectedEOF
+		}
+
+		if b[i] == 'e' {
+			break
+		}
+
+		var key, val interface{}
+
+		key, i, err = decode(b, i)
+		if err != nil {
+			return nil, i, err
+		}
+
+		keys, ok := key.(string)
+		if !ok {
+			return nil, i, fmt.Errorf("dict key is not a string")
+		}
+
+		val, i, err = decode(b, i)
+		if err != nil {
+			return nil, i, err
+		}
+
+		d[keys] = val
+	}
+
+	return d, i, nil
 }
 
 func decodeString(b string, st int) (string, int, error) {
