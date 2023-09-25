@@ -16,11 +16,47 @@ func decode(b string) (interface{}, error) {
 	}
 
 	switch {
+	case b[0] == 'i':
+		return decodeInt(b)
 	case b[0] >= '0' && b[0] <= '9':
 		return decodeString(b)
 	default:
 		return nil, fmt.Errorf("unexpected value type: %q", b[0])
 	}
+}
+
+func decodeInt(b string) (int, error) {
+	i := 1
+
+	if i == len(b) {
+		return 0, io.ErrUnexpectedEOF
+	}
+
+	neg := false
+
+	if b[i] == '-' {
+		neg = true
+		i++
+	}
+
+	var x int
+
+	for i < len(b) && b[i] >= '0' && b[i] <= '9' {
+		x = x*10 + (int(b[i]) - '0')
+		i++
+	}
+
+	if i == len(b) || b[i] != 'e' {
+		return 0, fmt.Errorf("bad int")
+	}
+
+	//	i++
+
+	if neg {
+		x = -x
+	}
+
+	return x, nil
 }
 
 func decodeString(b string) (string, error) {
