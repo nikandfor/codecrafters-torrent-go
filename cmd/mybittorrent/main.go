@@ -3,61 +3,71 @@ package main
 import (
 	// Uncomment this line to pass the first stage
 	// "encoding/json"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
-	"strconv"
-	"unicode"
 	// bencode "github.com/jackpal/bencode-go" // Available if you need it!
 )
 
-// Example:
-// - 5:hello -> hello
-// - 10:hello12345 -> hello12345
-func decodeBencode(bencodedString string) (interface{}, error) {
-	if unicode.IsDigit(rune(bencodedString[0])) {
-		var firstColonIndex int
+func decode(b string) (interface{}, error) {
+	if len(b) == 0 {
+		return nil, io.ErrUnexpectedEOF
+	}
 
-		for i := 0; i < len(bencodedString); i++ {
-			if bencodedString[i] == ':' {
-				firstColonIndex = i
-				break
-			}
-		}
-
-		lengthStr := bencodedString[:firstColonIndex]
-
-		length, err := strconv.Atoi(lengthStr)
-		if err != nil {
-			return "", err
-		}
-
-		return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], nil
-	} else {
-		return "", fmt.Errorf("Only strings are supported at the moment")
+	switch {
+	case b[0] >= '0' && b[0] <= '9':
+		return decodeString(b)
+	default:
+		return nil, fmt.Errorf("unexpected value type: %q", b[0])
 	}
 }
 
-func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+func decodeString(b string) (string, error) {
+	var l int
 
+	i := 0
+	for i < len(b) && b[i] >= '0' && b[i] <= '9' {
+		l = l*10 + (int(b[i]) - '0')
+		i++
+	}
+
+	if i == len(b) || b[i] != ':' {
+		return "", fmt.Errorf("bad string")
+	}
+
+	i++
+
+	if i+l > len(b) {
+		return "", fmt.Errorf("bad string: out of bounds")
+	}
+
+	x := b[i : i+l]
+	//	i += l
+
+	return x, nil
+}
+
+func main() {
 	command := os.Args[1]
 
-	if command == "decode" {
-		// Uncomment this block to pass the first stage
-		//
-		// bencodedValue := os.Args[2]
-		//
-		// decoded, err := decodeBencode(bencodedValue)
-		// if err != nil {
-		// 	fmt.Println(err)
-		// 	return
-		// }
-		//
-		// jsonOutput, _ := json.Marshal(decoded)
-		// fmt.Println(string(jsonOutput))
-	} else {
-		fmt.Println("Unknown command: " + command)
+	switch command {
+	case "decode":
+		x, err := decode(os.Args[2])
+		if err != nil {
+			fmt.Printf("error: %v\n", err)
+			os.Exit(1)
+		}
+
+		y, err := json.Marshal(x)
+		if err != nil {
+			fmt.Printf("error: marshal into json: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("%s\n", y)
+	default:
+		fmt.Printf("Unknown command: %v\n", command)
 		os.Exit(1)
 	}
 }
