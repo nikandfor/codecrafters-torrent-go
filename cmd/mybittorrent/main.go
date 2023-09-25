@@ -172,6 +172,33 @@ func main() {
 		}
 
 		fmt.Printf("%s\n", y)
+	case "info":
+		data, err := os.ReadFile(os.Args[2])
+		if err != nil {
+			fmt.Printf("error: read file: %v\n", err)
+			os.Exit(1)
+		}
+
+		x, _, err := decode(string(data), 0)
+		if err != nil {
+			fmt.Printf("error: %v\n", err)
+			os.Exit(1)
+		}
+
+		d, ok := x.(map[string]interface{})
+		if !ok {
+			fmt.Printf("error: not a dict\n")
+			os.Exit(1)
+		}
+
+		fmt.Printf("Tracker URL: %s\n", d["announce"])
+
+		info, ok := d["info"].(map[string]interface{})
+		if !ok || info == nil {
+			fmt.Printf("Length: not set\n")
+		}
+
+		fmt.Printf("Length: %d\n", info["length"])
 	default:
 		fmt.Printf("Unknown command: %v\n", command)
 		os.Exit(1)
